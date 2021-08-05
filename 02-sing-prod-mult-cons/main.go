@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"sync"
+	"time"
 )
 
 var messages = []string{
@@ -23,28 +25,31 @@ var messages = []string{
 	"because we're cowards.",
 }
 
-const consCount int = 3
+const numConsumers int = 3
 
-func produce(ch chan<- string) {
-	for _, m := range messages {
-		ch <- m
+func produce(msgs chan<- string) {
+	for _, msg := range messages {
+		fmt.Printf("producer: message: %s\n", msg)
+		msgs <- msg
 	}
-	close(ch)
+	close(msgs)
 }
 
-func consume(msgs <-chan string, done chan<- bool, worker int) {
-	for m := range msgs {
-		fmt.Printf("consume: worker = %d, message = %s\n", worker, m)
+func consume(msgs <-chan string, wg *sync.WaitGroup, cId int) {
+	for msg := range msgs {
+		time.Sleep(time.Millisecond * 200)
+		fmt.Printf("consumer #%d: message: %s\n", cId, msg)
 	}
-	done <- true
+	wg.Done()
 }
 
 func main() {
 	msgs := make(chan string)
-	done := make(chan bool)
+	wg := sync.WaitGroup{}
 	go produce(msgs)
-	for i := 1; i <= consCount; i++ {
-		go consume(msgs, done, i)
+	for cId := 1; cId <= numConsumers; cId++ {
+		wg.Add(1)
+		go consume(msgs, &wg, cId)
 	}
-	<-done
+	wg.Wait()
 }
